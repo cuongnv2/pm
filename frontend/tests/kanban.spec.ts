@@ -1,13 +1,18 @@
 import { expect, test } from "@playwright/test";
 
-test("loads the kanban board", async ({ page }) => {
+test.beforeEach(async ({ page }) => {
   await page.goto("/");
+  await page.fill('input[type="text"]', "user");
+  await page.fill('input[type="password"]', "password");
+  await page.click('button[type="submit"]');
   await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
+});
+
+test("loads the kanban board", async ({ page }) => {
   await expect(page.locator('[data-testid^="column-"]')).toHaveCount(5);
 });
 
 test("adds a card to a column", async ({ page }) => {
-  await page.goto("/");
   const firstColumn = page.locator('[data-testid^="column-"]').first();
   await firstColumn.getByRole("button", { name: /add a card/i }).click();
   await firstColumn.getByPlaceholder("Card title").fill("Playwright card");
@@ -17,7 +22,6 @@ test("adds a card to a column", async ({ page }) => {
 });
 
 test("moves a card between columns", async ({ page }) => {
-  await page.goto("/");
   const card = page.getByTestId("card-card-1");
   const targetColumn = page.getByTestId("column-col-review");
   const cardBox = await card.boundingBox();
@@ -38,4 +42,9 @@ test("moves a card between columns", async ({ page }) => {
   );
   await page.mouse.up();
   await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
+});
+
+test("logs out", async ({ page }) => {
+  await page.click('button:has-text("Logout")');
+  await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
 });
