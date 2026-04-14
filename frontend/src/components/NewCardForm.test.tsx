@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { NewCardForm } from "@/components/NewCardForm";
@@ -18,20 +18,23 @@ describe("NewCardForm", () => {
   it("opens form when add button is clicked", async () => {
     const user = userEvent.setup();
     render(<NewCardForm onAdd={mockOnAdd} />);
-    const addButton = screen.getByRole("button", { name: /add a card/i });
-
-    await user.click(addButton);
-
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
     expect(screen.getByPlaceholderText("Card title")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Details")).toBeInTheDocument();
+  });
+
+  it("renders priority selector and due date input", async () => {
+    const user = userEvent.setup();
+    render(<NewCardForm onAdd={mockOnAdd} />);
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
+    expect(screen.getByRole("combobox", { name: /priority/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/due date/i)).toBeInTheDocument();
   });
 
   it("allows entering title and details", async () => {
     const user = userEvent.setup();
     render(<NewCardForm onAdd={mockOnAdd} />);
-    const addButton = screen.getByRole("button", { name: /add a card/i });
-
-    await user.click(addButton);
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
 
     const titleInput = screen.getByPlaceholderText("Card title") as HTMLInputElement;
     const detailsInput = screen.getByPlaceholderText("Details") as HTMLTextAreaElement;
@@ -43,36 +46,36 @@ describe("NewCardForm", () => {
     expect(detailsInput.value).toBe("Task details");
   });
 
-  it("calls onAdd with title and details on submit", async () => {
+  it("calls onAdd with title, details, priority, and dueDate on submit", async () => {
     const user = userEvent.setup();
     render(<NewCardForm onAdd={mockOnAdd} />);
-    const addButton = screen.getByRole("button", { name: /add a card/i });
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
 
-    await user.click(addButton);
+    await user.type(screen.getByPlaceholderText("Card title"), "New Task");
+    await user.type(screen.getByPlaceholderText("Details"), "Important task");
+    await user.click(screen.getByRole("button", { name: /add card/i }));
 
-    const titleInput = screen.getByPlaceholderText("Card title");
-    const detailsInput = screen.getByPlaceholderText("Details");
-    const submitButton = screen.getByRole("button", { name: /add card/i });
+    expect(mockOnAdd).toHaveBeenCalledWith("New Task", "Important task", "medium", "");
+  });
 
-    await user.type(titleInput, "New Task");
-    await user.type(detailsInput, "Important task");
-    await user.click(submitButton);
+  it("calls onAdd with selected priority", async () => {
+    const user = userEvent.setup();
+    render(<NewCardForm onAdd={mockOnAdd} />);
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
 
-    expect(mockOnAdd).toHaveBeenCalledWith("New Task", "Important task");
+    await user.type(screen.getByPlaceholderText("Card title"), "Urgent");
+    await user.selectOptions(screen.getByRole("combobox", { name: /priority/i }), "high");
+    await user.click(screen.getByRole("button", { name: /add card/i }));
+
+    expect(mockOnAdd).toHaveBeenCalledWith("Urgent", "", "high", "");
   });
 
   it("closes form after successful submission", async () => {
     const user = userEvent.setup();
     render(<NewCardForm onAdd={mockOnAdd} />);
-    const addButton = screen.getByRole("button", { name: /add a card/i });
-
-    await user.click(addButton);
-
-    const titleInput = screen.getByPlaceholderText("Card title");
-    const submitButton = screen.getByRole("button", { name: /add card/i });
-
-    await user.type(titleInput, "New Task");
-    await user.click(submitButton);
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
+    await user.type(screen.getByPlaceholderText("Card title"), "New Task");
+    await user.click(screen.getByRole("button", { name: /add card/i }));
 
     expect(screen.queryByPlaceholderText("Card title")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add a card/i })).toBeInTheDocument();
@@ -81,12 +84,8 @@ describe("NewCardForm", () => {
   it("closes form on cancel", async () => {
     const user = userEvent.setup();
     render(<NewCardForm onAdd={mockOnAdd} />);
-    const addButton = screen.getByRole("button", { name: /add a card/i });
-
-    await user.click(addButton);
-
-    const cancelButton = screen.getByRole("button", { name: /cancel/i });
-    await user.click(cancelButton);
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(screen.queryByPlaceholderText("Card title")).not.toBeInTheDocument();
     expect(mockOnAdd).not.toHaveBeenCalled();
@@ -95,31 +94,20 @@ describe("NewCardForm", () => {
   it("trims whitespace from title and details", async () => {
     const user = userEvent.setup();
     render(<NewCardForm onAdd={mockOnAdd} />);
-    const addButton = screen.getByRole("button", { name: /add a card/i });
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
 
-    await user.click(addButton);
+    await user.type(screen.getByPlaceholderText("Card title"), "  New Task  ");
+    await user.type(screen.getByPlaceholderText("Details"), "  Details  ");
+    await user.click(screen.getByRole("button", { name: /add card/i }));
 
-    const titleInput = screen.getByPlaceholderText("Card title");
-    const detailsInput = screen.getByPlaceholderText("Details");
-    const submitButton = screen.getByRole("button", { name: /add card/i });
-
-    await user.type(titleInput, "  New Task  ");
-    await user.type(detailsInput, "  Details  ");
-    await user.click(submitButton);
-
-    expect(mockOnAdd).toHaveBeenCalledWith("New Task", "Details");
+    expect(mockOnAdd).toHaveBeenCalledWith("New Task", "Details", "medium", "");
   });
 
   it("prevents submission with empty title", async () => {
     const user = userEvent.setup();
     render(<NewCardForm onAdd={mockOnAdd} />);
-    const addButton = screen.getByRole("button", { name: /add a card/i });
-
-    await user.click(addButton);
-
-    const submitButton = screen.getByRole("button", { name: /add card/i });
-    await user.click(submitButton);
-
+    await user.click(screen.getByRole("button", { name: /add a card/i }));
+    await user.click(screen.getByRole("button", { name: /add card/i }));
     expect(mockOnAdd).not.toHaveBeenCalled();
   });
 
@@ -127,18 +115,12 @@ describe("NewCardForm", () => {
     const user = userEvent.setup();
     render(<NewCardForm onAdd={mockOnAdd} />);
 
-    // First submission
     await user.click(screen.getByRole("button", { name: /add a card/i }));
-    const titleInput = screen.getByPlaceholderText("Card title");
-    const detailsInput = screen.getByPlaceholderText("Details");
-
-    await user.type(titleInput, "Task 1");
-    await user.type(detailsInput, "Details 1");
+    await user.type(screen.getByPlaceholderText("Card title"), "Task 1");
+    await user.type(screen.getByPlaceholderText("Details"), "Details 1");
     await user.click(screen.getByRole("button", { name: /add card/i }));
 
-    // Open form again
     await user.click(screen.getByRole("button", { name: /add a card/i }));
-
     expect((screen.getByPlaceholderText("Card title") as HTMLInputElement).value).toBe("");
     expect((screen.getByPlaceholderText("Details") as HTMLTextAreaElement).value).toBe("");
   });

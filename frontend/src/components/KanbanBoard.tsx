@@ -18,7 +18,7 @@ import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { createPortal } from "react-dom";
 import { createId, moveCard, type BoardData, type BoardMeta, type Priority } from "@/lib/kanban";
-import { getToken } from "@/lib/auth";
+import { useLang } from "@/lib/i18nContext";
 
 interface KanbanBoardProps {
   initialData: BoardData | null;
@@ -35,6 +35,14 @@ interface KanbanBoardProps {
   onRenameBoard: (boardId: number, name: string) => void;
 }
 
+const KanbanIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="3" width="7" height="18" rx="1" />
+    <rect x="14" y="3" width="7" height="10" rx="1" />
+    <rect x="14" y="17" width="7" height="4" rx="1" />
+  </svg>
+);
+
 // ---- Board Selector Dropdown ----
 type BoardSelectorProps = {
   boards: BoardMeta[];
@@ -46,6 +54,7 @@ type BoardSelectorProps = {
 };
 
 const BoardSelector = ({ boards, activeBoardId, onSwitch, onCreate, onDelete, onRename }: BoardSelectorProps) => {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<number | null>(null);
@@ -54,9 +63,7 @@ const BoardSelector = ({ boards, activeBoardId, onSwitch, onCreate, onDelete, on
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -69,19 +76,19 @@ const BoardSelector = ({ boards, activeBoardId, onSwitch, onCreate, onDelete, on
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-xl border border-[var(--stroke)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--navy-dark)] shadow-sm transition hover:bg-[var(--surface)]"
-        aria-label="Switch board"
+        className="flex items-center gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-2 text-sm font-semibold text-[var(--navy-dark)] shadow-sm transition hover:border-[var(--primary-blue)]"
+        aria-label={t.switchBoard}
         data-testid="board-selector"
       >
-        <span className="max-w-[140px] truncate">{activeBoard?.name ?? "Select board"}</span>
+        <span className="max-w-[160px] truncate">{activeBoard?.name ?? t.selectBoard}</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-2 w-64 rounded-2xl border border-[var(--stroke)] bg-white p-2 shadow-[0_16px_40px_rgba(3,33,71,0.15)]">
-          <p className="mb-1 px-2 pt-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">Your boards</p>
+        <div className="absolute left-0 top-full z-30 mt-2 w-64 rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] p-2 shadow-[0_16px_40px_rgba(3,33,71,0.18)]">
+          <p className="mb-1 px-2 pt-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">{t.yourBoards}</p>
           <div className="max-h-56 overflow-y-auto">
             {boards.map((board) => (
               <div
@@ -93,20 +100,17 @@ const BoardSelector = ({ boards, activeBoardId, onSwitch, onCreate, onDelete, on
                     className="flex flex-1 gap-1"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (renameValue.trim()) {
-                        onRename(board.id, renameValue.trim());
-                        setRenamingId(null);
-                      }
+                      if (renameValue.trim()) { onRename(board.id, renameValue.trim()); setRenamingId(null); }
                     }}
                   >
                     <input
                       autoFocus
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
-                      className="flex-1 rounded-lg border border-[var(--primary-blue)] px-2 py-1 text-sm outline-none"
+                      className="flex-1 rounded-lg border border-[var(--primary-blue)] bg-[var(--surface-strong)] px-2 py-1 text-sm text-[var(--navy-dark)] outline-none"
                     />
-                    <button type="submit" className="rounded-lg bg-[var(--primary-blue)] px-2 py-1 text-xs font-semibold text-white">Save</button>
-                    <button type="button" onClick={() => setRenamingId(null)} className="rounded-lg border border-[var(--stroke)] px-2 py-1 text-xs">Cancel</button>
+                    <button type="submit" className="rounded-lg bg-[var(--primary-blue)] px-2 py-1 text-xs font-semibold text-white">{t.save}</button>
+                    <button type="button" onClick={() => setRenamingId(null)} className="rounded-lg border border-[var(--stroke)] px-2 py-1 text-xs text-[var(--navy-dark)]">{t.cancel}</button>
                   </form>
                 ) : (
                   <>
@@ -146,21 +150,17 @@ const BoardSelector = ({ boards, activeBoardId, onSwitch, onCreate, onDelete, on
               className="flex gap-1"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (newName.trim()) {
-                  onCreate(newName.trim());
-                  setNewName("");
-                  setOpen(false);
-                }
+                if (newName.trim()) { onCreate(newName.trim()); setNewName(""); setOpen(false); }
               }}
             >
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="New board name"
-                className="flex-1 rounded-lg border border-[var(--stroke)] px-2 py-1.5 text-xs outline-none focus:border-[var(--primary-blue)]"
+                placeholder={t.newBoardNamePlaceholder}
+                className="flex-1 rounded-lg border border-[var(--stroke)] bg-[var(--surface)] px-2 py-1.5 text-xs text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
                 aria-label="New board name"
               />
-              <button type="submit" className="rounded-lg bg-[var(--primary-blue)] px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--primary-blue)]/85" aria-label="Create board">
+              <button type="submit" className="rounded-lg bg-[var(--primary-blue)] px-2.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-85" aria-label="Create board">
                 +
               </button>
             </form>
@@ -172,27 +172,25 @@ const BoardSelector = ({ boards, activeBoardId, onSwitch, onCreate, onDelete, on
 };
 
 // ---- Delete Board Confirm Modal ----
-type DeleteBoardModalProps = {
-  boardName: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-};
-const DeleteBoardModal = ({ boardName, onConfirm, onCancel }: DeleteBoardModalProps) =>
-  createPortal(
+type DeleteBoardModalProps = { boardName: string; onConfirm: () => void; onCancel: () => void };
+const DeleteBoardModal = ({ boardName, onConfirm, onCancel }: DeleteBoardModalProps) => {
+  const { t } = useLang();
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel} role="dialog" aria-modal="true">
-      <div className="mx-4 w-full max-w-sm rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_24px_48px_rgba(3,33,71,0.18)]" onClick={(e) => e.stopPropagation()}>
-        <h2 className="font-display text-lg font-semibold text-[var(--navy-dark)]">Delete board?</h2>
+      <div className="mx-4 w-full max-w-sm rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] p-6 shadow-[0_24px_48px_rgba(0,0,0,0.25)]" onClick={(e) => e.stopPropagation()}>
+        <h2 className="font-display text-lg font-semibold text-[var(--navy-dark)]">{t.deleteBoardTitle}</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">
-          <span className="font-semibold text-[var(--navy-dark)]">&ldquo;{boardName}&rdquo;</span> and all its cards will be permanently removed.
+          <span className="font-semibold text-[var(--navy-dark)]">&ldquo;{boardName}&rdquo;</span> {t.deleteBoardSuffix}
         </p>
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--stroke)] px-4 py-2 text-sm font-semibold text-[var(--navy-dark)] transition hover:bg-[var(--surface)]" aria-label="Cancel board delete">Cancel</button>
-          <button type="button" onClick={onConfirm} className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600" aria-label="Confirm board delete">Delete</button>
+          <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--stroke)] px-4 py-2 text-sm font-semibold text-[var(--navy-dark)] transition hover:bg-[var(--surface)]" aria-label="Cancel board delete">{t.cancel}</button>
+          <button type="button" onClick={onConfirm} className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600" aria-label="Confirm board delete">{t.confirmDelete}</button>
         </div>
       </div>
     </div>,
     document.body
   );
+};
 
 
 // ---- Main KanbanBoard ----
@@ -200,6 +198,7 @@ export const KanbanBoard = ({
   initialData, boards, activeBoardId, onUpdate, onLogout, onRefresh,
   onToggleDark, darkMode, onSwitchBoard, onCreateBoard, onDeleteBoard, onRenameBoard,
 }: KanbanBoardProps) => {
+  const { t, lang, toggleLang } = useLang();
   const [board, setBoard] = useState<BoardData>(() => initialData || { columns: [], cards: {} });
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [deletingBoardId, setDeletingBoardId] = useState<number | null>(null);
@@ -249,7 +248,7 @@ export const KanbanBoard = ({
     onUpdate(newBoard);
   };
 
-  const handleEditCard = (columnId: string, cardId: string, updates: { title: string; details: string; priority: Priority; dueDate: string }) => {
+  const handleEditCard = (_columnId: string, cardId: string, updates: { title: string; details: string; priority: Priority; dueDate: string }) => {
     const newBoard = {
       ...board,
       cards: { ...board.cards, [cardId]: { ...board.cards[cardId], ...updates } },
@@ -274,7 +273,7 @@ export const KanbanBoard = ({
     const id = createId("col");
     const newBoard = {
       ...board,
-      columns: [...board.columns, { id, title: "New Column", cardIds: [] }],
+      columns: [...board.columns, { id, title: t.newColumn, cardIds: [] }],
     };
     setBoard(newBoard);
     onUpdate(newBoard);
@@ -296,68 +295,60 @@ export const KanbanBoard = ({
 
   const handleDeleteBoard = (boardId: number) => setDeletingBoardId(boardId);
   const confirmDeleteBoard = () => {
-    if (deletingBoardId !== null) {
-      onDeleteBoard(deletingBoardId);
-      setDeletingBoardId(null);
-    }
+    if (deletingBoardId !== null) { onDeleteBoard(deletingBoardId); setDeletingBoardId(null); }
   };
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
   const deletingBoard = boards.find((b) => b.id === deletingBoardId);
 
+  const btnBase = "rounded-lg border border-[var(--stroke)] bg-[var(--surface-strong)] px-3 py-2 text-sm font-semibold text-[var(--navy-dark)] transition hover:border-[var(--primary-blue)]";
+
   return (
-    <div className="relative overflow-hidden">
-      <div className="pointer-events-none absolute left-0 top-0 h-[420px] w-[420px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,_rgba(32,157,215,0.25)_0%,_rgba(32,157,215,0.05)_55%,_transparent_70%)]" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-[520px] w-[520px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(117,57,145,0.18)_0%,_rgba(117,57,145,0.05)_55%,_transparent_75%)]" />
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="pointer-events-none fixed left-0 top-0 h-[420px] w-[420px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,_rgba(32,157,215,0.15)_0%,_rgba(32,157,215,0.03)_55%,_transparent_70%)]" />
+      <div className="pointer-events-none fixed bottom-0 right-0 h-[520px] w-[520px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(117,57,145,0.12)_0%,_rgba(117,57,145,0.03)_55%,_transparent_75%)]" />
 
-      <main className="relative mx-auto flex min-h-screen max-w-[1500px] flex-col gap-10 px-6 pb-16 pt-12 pr-80">
-        <header className="flex flex-col gap-6 rounded-[32px] border border-[var(--stroke)] bg-white/80 p-8 shadow-[var(--shadow)] backdrop-blur">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
-                Project Management
-              </p>
-              <h1 className="mt-3 font-display text-4xl font-semibold text-[var(--navy-dark)]">
-                Kanban Studio
-              </h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--gray-text)]">
-                Keep momentum visible. Rename columns, drag cards between stages,
-                and capture quick notes without getting buried in settings.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <BoardSelector
-                boards={boards}
-                activeBoardId={activeBoardId}
-                onSwitch={onSwitchBoard}
-                onCreate={onCreateBoard}
-                onDelete={handleDeleteBoard}
-                onRename={onRenameBoard}
-              />
-              <button
-                onClick={onToggleDark}
-                className="rounded-lg border border-[var(--stroke)] bg-white px-4 py-2 text-sm font-semibold text-[var(--navy-dark)] transition hover:bg-[var(--surface)]"
-              >
-                {darkMode ? "Light" : "Dark"}
-              </button>
-              <button
-                onClick={onLogout}
-                className="rounded-lg bg-[var(--secondary-purple)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--secondary-purple)]/90"
-              >
-                Logout
-              </button>
-            </div>
+      {/* Slim sticky navbar */}
+      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--stroke)] bg-[var(--surface-strong)]/90 px-6 py-3 shadow-sm backdrop-blur-md">
+        {/* Logo + title */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--primary-blue)]">
+            <KanbanIcon />
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {board.columns.map((column) => (
-              <div key={column.id} className="flex items-center gap-2 rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)]">
-                <span className="h-2 w-2 rounded-full bg-[var(--accent-yellow)]" />
-                {column.title}
-              </div>
-            ))}
-          </div>
-        </header>
+          <span className="font-display text-base font-semibold text-[var(--navy-dark)]">{t.appName}</span>
+        </div>
 
+        {/* Board selector */}
+        <div className="mx-4 flex-1">
+          <BoardSelector
+            boards={boards}
+            activeBoardId={activeBoardId}
+            onSwitch={onSwitchBoard}
+            onCreate={onCreateBoard}
+            onDelete={handleDeleteBoard}
+            onRename={onRenameBoard}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button type="button" onClick={toggleLang} className={btnBase} aria-label="Toggle language">
+            {lang === "en" ? "VI" : "EN"}
+          </button>
+          <button type="button" onClick={onToggleDark} className={btnBase}>
+            {darkMode ? t.light : t.dark}
+          </button>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="rounded-lg bg-[var(--secondary-purple)] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            {t.logout}
+          </button>
+        </div>
+      </header>
+
+      <main className="relative mx-auto flex min-h-[calc(100vh-52px)] max-w-[1600px] flex-col gap-6 px-6 pb-16 pt-6 pr-80">
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <section className="flex gap-4 overflow-x-auto pb-2">
             {board.columns.map((column) => (
@@ -383,7 +374,7 @@ export const KanbanBoard = ({
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                Add Column
+                {t.addColumn}
               </button>
             </div>
           </section>

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { Card, Priority } from "@/lib/kanban";
 import { isOverdue } from "@/lib/kanban";
+import { useLang } from "@/lib/i18nContext";
 
 type KanbanCardProps = {
   card: Card;
@@ -12,11 +13,11 @@ type KanbanCardProps = {
   onEdit: (cardId: string, updates: { title: string; details: string; priority: Priority; dueDate: string }) => void;
 };
 
-const PRIORITY_CONFIG: Record<Priority, { label: string; color: string }> = {
-  low:      { label: "Low",      color: "bg-gray-200 text-gray-600" },
-  medium:   { label: "Medium",   color: "bg-yellow-100 text-yellow-700" },
-  high:     { label: "High",     color: "bg-orange-100 text-orange-700" },
-  critical: { label: "Critical", color: "bg-red-100 text-red-700" },
+const PRIORITY_CONFIG: Record<Priority, { color: string }> = {
+  low:      { color: "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300" },
+  medium:   { color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300" },
+  high:     { color: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300" },
+  critical: { color: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300" },
 };
 
 const TrashIcon = () => (
@@ -42,22 +43,24 @@ const CalendarIcon = () => (
 
 // ---- Delete confirm modal ----
 type DeleteModalProps = { cardTitle: string; onConfirm: () => void; onCancel: () => void };
-const DeleteModal = ({ cardTitle, onConfirm, onCancel }: DeleteModalProps) =>
-  createPortal(
+const DeleteModal = ({ cardTitle, onConfirm, onCancel }: DeleteModalProps) => {
+  const { t } = useLang();
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel} role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
-      <div className="mx-4 w-full max-w-sm rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_24px_48px_rgba(3,33,71,0.18)]" onClick={(e) => e.stopPropagation()}>
-        <h2 id="confirm-dialog-title" className="font-display text-lg font-semibold text-[var(--navy-dark)]">Delete card?</h2>
+      <div className="mx-4 w-full max-w-sm rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] p-6 shadow-[0_24px_48px_rgba(0,0,0,0.25)]" onClick={(e) => e.stopPropagation()}>
+        <h2 id="confirm-dialog-title" className="font-display text-lg font-semibold text-[var(--navy-dark)]">{t.deleteCardTitle}</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">
-          <span className="font-semibold text-[var(--navy-dark)]">&ldquo;{cardTitle}&rdquo;</span> will be permanently removed.
+          <span className="font-semibold text-[var(--navy-dark)]">&ldquo;{cardTitle}&rdquo;</span> {t.permanentlyRemoved}
         </p>
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--stroke)] px-4 py-2 text-sm font-semibold text-[var(--navy-dark)] transition hover:bg-[var(--surface)]" aria-label="Cancel delete">Cancel</button>
-          <button type="button" onClick={onConfirm} className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600" aria-label="Confirm delete">Delete</button>
+          <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--stroke)] px-4 py-2 text-sm font-semibold text-[var(--navy-dark)] transition hover:bg-[var(--surface)]" aria-label="Cancel delete">{t.cancel}</button>
+          <button type="button" onClick={onConfirm} className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600" aria-label="Confirm delete">{t.confirmDelete}</button>
         </div>
       </div>
     </div>,
     document.body
   );
+};
 
 // ---- Edit modal ----
 type EditModalProps = {
@@ -66,15 +69,18 @@ type EditModalProps = {
   onCancel: () => void;
 };
 const EditModal = ({ card, onSave, onCancel }: EditModalProps) => {
+  const { t } = useLang();
   const [title, setTitle] = useState(card.title);
   const [details, setDetails] = useState(card.details);
   const [priority, setPriority] = useState<Priority>(card.priority);
   const [dueDate, setDueDate] = useState(card.dueDate);
 
+  const inputClass = "rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)] focus:ring-2 focus:ring-[var(--primary-blue)]/20";
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel} role="dialog" aria-modal="true" aria-labelledby="edit-dialog-title">
-      <div className="mx-4 w-full max-w-md rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_24px_48px_rgba(3,33,71,0.18)]" onClick={(e) => e.stopPropagation()}>
-        <h2 id="edit-dialog-title" className="font-display text-lg font-semibold text-[var(--navy-dark)]">Edit card</h2>
+      <div className="mx-4 w-full max-w-md rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] p-6 shadow-[0_24px_48px_rgba(0,0,0,0.25)]" onClick={(e) => e.stopPropagation()}>
+        <h2 id="edit-dialog-title" className="font-display text-lg font-semibold text-[var(--navy-dark)]">{t.editCardTitle}</h2>
         <form
           className="mt-4 flex flex-col gap-4"
           onSubmit={(e) => {
@@ -83,55 +89,31 @@ const EditModal = ({ card, onSave, onCancel }: EditModalProps) => {
           }}
         >
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">Title</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="rounded-xl border border-[var(--stroke)] px-3 py-2 text-sm text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)] focus:ring-2 focus:ring-[var(--primary-blue)]/20"
-              required
-              aria-label="Card title"
-              data-testid="edit-title"
-            />
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">{t.cardTitleLabel}</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} required aria-label="Card title" data-testid="edit-title" />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">Details</label>
-            <textarea
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              rows={3}
-              className="resize-none rounded-xl border border-[var(--stroke)] px-3 py-2 text-sm text-[var(--gray-text)] outline-none focus:border-[var(--primary-blue)] focus:ring-2 focus:ring-[var(--primary-blue)]/20"
-              aria-label="Card details"
-            />
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">{t.detailsPlaceholder}</label>
+            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} className={`resize-none ${inputClass}`} aria-label="Card details" />
           </div>
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as Priority)}
-                className="rounded-xl border border-[var(--stroke)] px-3 py-2 text-sm text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
-                aria-label="Card priority"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
+              <label className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">{t.priority}</label>
+              <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className={inputClass} aria-label="Card priority">
+                <option value="low">{t.low}</option>
+                <option value="medium">{t.medium}</option>
+                <option value="high">{t.high}</option>
+                <option value="critical">{t.critical}</option>
               </select>
             </div>
             <div className="flex flex-1 flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">Due date</label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="rounded-xl border border-[var(--stroke)] px-3 py-2 text-sm text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
-                aria-label="Card due date"
-              />
+              <label className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">{t.dueDate}</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputClass} aria-label="Card due date" />
             </div>
           </div>
           <div className="mt-2 flex justify-end gap-3">
-            <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--stroke)] px-4 py-2 text-sm font-semibold text-[var(--navy-dark)] transition hover:bg-[var(--surface)]">Cancel</button>
-            <button type="submit" className="rounded-lg bg-[var(--primary-blue)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--primary-blue)]/85" aria-label="Save card">Save</button>
+            <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--stroke)] px-4 py-2 text-sm font-semibold text-[var(--navy-dark)] transition hover:bg-[var(--surface)]">{t.cancel}</button>
+            <button type="submit" className="rounded-lg bg-[var(--primary-blue)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-85" aria-label="Save card">{t.save}</button>
           </div>
         </form>
       </div>
@@ -142,12 +124,14 @@ const EditModal = ({ card, onSave, onCancel }: EditModalProps) => {
 
 // ---- KanbanCard ----
 export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
+  const { t } = useLang();
   const [showDelete, setShowDelete] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   const style = { transform: CSS.Transform.toString(transform), transition };
-  const priority = PRIORITY_CONFIG[card.priority] ?? PRIORITY_CONFIG.medium;
+  const priorityConf = PRIORITY_CONFIG[card.priority] ?? PRIORITY_CONFIG.medium;
+  const priorityLabel = t[card.priority as keyof typeof t] as string ?? card.priority;
   const overdue = isOverdue(card.dueDate);
 
   return (
@@ -156,7 +140,7 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
         ref={setNodeRef}
         style={style}
         className={clsx(
-          "rounded-2xl border border-transparent bg-white px-4 py-4 shadow-[0_12px_24px_rgba(3,33,71,0.08)] cursor-grab active:cursor-grabbing",
+          "rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-4 shadow-[var(--shadow)] cursor-grab active:cursor-grabbing",
           "transition-all duration-150",
           isDragging && "opacity-60 shadow-[0_18px_32px_rgba(3,33,71,0.16)]"
         )}
@@ -171,17 +155,17 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
               <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">{card.details}</p>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className={clsx("rounded-full px-2 py-0.5 text-xs font-semibold", priority.color)}>
-                {priority.label}
+              <span className={clsx("rounded-full px-2 py-0.5 text-xs font-semibold", priorityConf.color)}>
+                {priorityLabel}
               </span>
               {card.dueDate && (
                 <span className={clsx(
                   "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                  overdue ? "bg-red-100 text-red-700" : "bg-[var(--surface)] text-[var(--gray-text)]"
+                  overdue ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300" : "bg-[var(--surface)] text-[var(--gray-text)]"
                 )}>
                   <CalendarIcon />
                   {card.dueDate}
-                  {overdue && " (overdue)"}
+                  {overdue && ` (${t.overdue})`}
                 </span>
               )}
             </div>

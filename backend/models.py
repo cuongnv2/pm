@@ -9,6 +9,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=False)
+    display_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
 class Board(Base):
@@ -32,3 +33,5 @@ class Card(Base):
     title = Column(String, nullable=False)
     details = Column(Text)
     position = Column(Integer, nullable=False)
+    priority = Column(String, default='medium')  # low | medium | high | critical
+    due_date = Column(String, nullable=True)      # ISO date string YYYY-MM-DD

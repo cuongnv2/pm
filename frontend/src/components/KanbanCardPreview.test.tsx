@@ -9,6 +9,8 @@ describe("KanbanCardPreview", () => {
     id: "card-1",
     title: "Test Card",
     details: "Test details",
+    priority: "medium",
+    dueDate: "",
   };
 
   it("renders card title and details", () => {
@@ -22,6 +24,8 @@ describe("KanbanCardPreview", () => {
       id: "card-2",
       title: "Complex Task",
       details: "This is a detail text",
+      priority: "high",
+      dueDate: "2026-12-31",
     };
 
     render(<KanbanCardPreview card={card} />);
@@ -34,6 +38,8 @@ describe("KanbanCardPreview", () => {
       id: "card-3",
       title: "No Details Card",
       details: "",
+      priority: "low",
+      dueDate: "",
     };
 
     render(<KanbanCardPreview card={card} />);

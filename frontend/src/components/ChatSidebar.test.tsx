@@ -5,7 +5,6 @@ import { ChatSidebar } from "@/components/ChatSidebar";
 
 vi.mock("@/lib/auth", () => ({
   getToken: () => "test-token",
-  getUserId: () => "1",
 }));
 
 global.fetch = vi.fn();
@@ -20,7 +19,7 @@ describe("ChatSidebar", () => {
   });
 
   it("renders chat sidebar with title and input", () => {
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     expect(screen.getByRole("heading", { name: "AI Assistant" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Ask the AI...")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
@@ -28,7 +27,7 @@ describe("ChatSidebar", () => {
 
   it("allows user to type a message", async () => {
     const user = userEvent.setup();
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     const input = screen.getByPlaceholderText("Ask the AI...") as HTMLInputElement;
 
     await user.type(input, "Test message");
@@ -42,7 +41,7 @@ describe("ChatSidebar", () => {
       json: async () => ({ response: "AI response", updated: false }),
     });
 
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     const input = screen.getByPlaceholderText("Ask the AI...");
     const sendButton = screen.getByRole("button", { name: "Send" });
 
@@ -51,7 +50,7 @@ describe("ChatSidebar", () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        "/api/ai/chat/1",
+        "/api/ai/chat/board/1",
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({ "Content-Type": "application/json" }),
@@ -68,7 +67,7 @@ describe("ChatSidebar", () => {
       json: async () => ({ response: "AI response", updated: false }),
     });
 
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     const input = screen.getByPlaceholderText("Ask the AI...");
 
     await user.type(input, "Hello AI");
@@ -86,7 +85,7 @@ describe("ChatSidebar", () => {
       json: async () => ({ response: "Hello user!", updated: false }),
     });
 
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     const input = screen.getByPlaceholderText("Ask the AI...");
     const sendButton = screen.getByRole("button", { name: "Send" });
 
@@ -105,7 +104,7 @@ describe("ChatSidebar", () => {
       json: async () => ({ response: "AI response", updated: false }),
     });
 
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     const input = screen.getByPlaceholderText("Ask the AI...") as HTMLInputElement;
     const sendButton = screen.getByRole("button", { name: "Send" });
 
@@ -124,7 +123,7 @@ describe("ChatSidebar", () => {
       json: async () => ({ response: "Board updated!", updated: true }),
     });
 
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     const input = screen.getByPlaceholderText("Ask the AI...");
     const sendButton = screen.getByRole("button", { name: "Send" });
 
@@ -143,7 +142,7 @@ describe("ChatSidebar", () => {
       json: async () => ({ error: "Server error" }),
     });
 
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     const input = screen.getByPlaceholderText("Ask the AI...");
     const sendButton = screen.getByRole("button", { name: "Send" });
 
@@ -166,7 +165,7 @@ describe("ChatSidebar", () => {
       })
     );
 
-    render(<ChatSidebar onRefresh={mockOnRefresh} />);
+    render(<ChatSidebar boardId={1} onRefresh={mockOnRefresh} />);
     const input = screen.getByPlaceholderText("Ask the AI...");
     const sendButton = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
 

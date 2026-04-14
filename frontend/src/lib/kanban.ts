@@ -1,7 +1,11 @@
+export type Priority = "low" | "medium" | "high" | "critical";
+
 export type Card = {
   id: string;
   title: string;
   details: string;
+  priority: Priority;
+  dueDate: string; // ISO date YYYY-MM-DD or ""
 };
 
 export type Column = {
@@ -13,6 +17,12 @@ export type Column = {
 export type BoardData = {
   columns: Column[];
   cards: Record<string, Card>;
+};
+
+export type BoardMeta = {
+  id: number;
+  name: string;
+  created_at: string;
 };
 
 const isColumnId = (columns: Column[], id: string) =>
@@ -109,4 +119,9 @@ export const createId = (prefix: string) => {
   const randomPart = Math.random().toString(36).slice(2, 8);
   const timePart = Date.now().toString(36);
   return `${prefix}-${randomPart}${timePart}`;
+};
+
+export const isOverdue = (dueDate: string): boolean => {
+  if (!dueDate) return false;
+  return new Date(dueDate) < new Date(new Date().toDateString());
 };

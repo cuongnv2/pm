@@ -149,9 +149,14 @@ def test_update_board_success(auth_headers):
 
         response = client.get("/api/board/1", headers=auth_headers)
         new_data = response.json()
-        assert new_data["cards"][first_card_key]["title"] == "New Title"
+        # After PUT, cards are re-inserted with new IDs — check by value not key
+        assert any(c["title"] == "New Title" for c in new_data["cards"].values())
 
-        new_data["cards"][first_card_key]["title"] = original_title
+        # Restore original title using whatever key the new board assigned
+        for key, card in new_data["cards"].items():
+            if card["title"] == "New Title":
+                new_data["cards"][key]["title"] = original_title
+                break
         client.put("/api/board/1", json=new_data, headers=auth_headers)
 
 def test_update_board_forbidden_other_user(auth_headers):

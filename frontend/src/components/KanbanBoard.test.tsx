@@ -67,7 +67,7 @@ describe("KanbanBoard", () => {
 
   it("renders header with title", () => {
     render(<KanbanBoard {...defaultProps} />);
-    expect(screen.getByRole("heading", { name: "Kanban Studio" })).toBeInTheDocument();
+    expect(screen.getByText("Kanban Studio")).toBeInTheDocument();
   });
 
   it("renders logout button", () => {
