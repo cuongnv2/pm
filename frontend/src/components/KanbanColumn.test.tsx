@@ -33,13 +33,15 @@ describe("KanbanColumn", () => {
   };
 
   const mockCards: Card[] = [
-    { id: "card-1", title: "Task 1", details: "Details 1" },
-    { id: "card-2", title: "Task 2", details: "Details 2" },
+    { id: "card-1", title: "Task 1", details: "Details 1", priority: "medium", dueDate: "" },
+    { id: "card-2", title: "Task 2", details: "Details 2", priority: "high", dueDate: "2026-12-31" },
   ];
 
   const mockOnRename = vi.fn();
   const mockOnAddCard = vi.fn();
   const mockOnDeleteCard = vi.fn();
+  const mockOnDeleteColumn = vi.fn();
+  const mockOnEditCard = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,6 +55,8 @@ describe("KanbanColumn", () => {
         onRename={mockOnRename}
         onAddCard={mockOnAddCard}
         onDeleteCard={mockOnDeleteCard}
+        onEditCard={mockOnEditCard}
+        onDeleteColumn={mockOnDeleteColumn}
       />
     );
     expect(screen.getByDisplayValue("To Do")).toBeInTheDocument();
@@ -66,6 +70,8 @@ describe("KanbanColumn", () => {
         onRename={mockOnRename}
         onAddCard={mockOnAddCard}
         onDeleteCard={mockOnDeleteCard}
+        onEditCard={mockOnEditCard}
+        onDeleteColumn={mockOnDeleteColumn}
       />
     );
     expect(screen.getByText("2 cards")).toBeInTheDocument();
@@ -79,6 +85,8 @@ describe("KanbanColumn", () => {
         onRename={mockOnRename}
         onAddCard={mockOnAddCard}
         onDeleteCard={mockOnDeleteCard}
+        onEditCard={mockOnEditCard}
+        onDeleteColumn={mockOnDeleteColumn}
       />
     );
     expect(screen.getByText("Task 1")).toBeInTheDocument();
@@ -94,6 +102,8 @@ describe("KanbanColumn", () => {
         onRename={mockOnRename}
         onAddCard={mockOnAddCard}
         onDeleteCard={mockOnDeleteCard}
+        onEditCard={mockOnEditCard}
+        onDeleteColumn={mockOnDeleteColumn}
       />
     );
     const titleInput = screen.getByDisplayValue("To Do") as HTMLInputElement;
@@ -116,6 +126,8 @@ describe("KanbanColumn", () => {
         onRename={mockOnRename}
         onAddCard={mockOnAddCard}
         onDeleteCard={mockOnDeleteCard}
+        onEditCard={mockOnEditCard}
+        onDeleteColumn={mockOnDeleteColumn}
       />
     );
     expect(screen.getByText("0 cards")).toBeInTheDocument();
@@ -130,6 +142,8 @@ describe("KanbanColumn", () => {
         onRename={mockOnRename}
         onAddCard={mockOnAddCard}
         onDeleteCard={mockOnDeleteCard}
+        onEditCard={mockOnEditCard}
+        onDeleteColumn={mockOnDeleteColumn}
       />
     );
     expect(screen.getByRole("button", { name: /add a card/i })).toBeInTheDocument();
@@ -143,6 +157,8 @@ describe("KanbanColumn", () => {
         onRename={mockOnRename}
         onAddCard={mockOnAddCard}
         onDeleteCard={mockOnDeleteCard}
+        onEditCard={mockOnEditCard}
+        onDeleteColumn={mockOnDeleteColumn}
       />
     );
     expect(screen.getByTestId("column-col-1")).toBeInTheDocument();
@@ -156,6 +172,8 @@ describe("KanbanColumn", () => {
         onRename={mockOnRename}
         onAddCard={mockOnAddCard}
         onDeleteCard={mockOnDeleteCard}
+        onEditCard={mockOnEditCard}
+        onDeleteColumn={mockOnDeleteColumn}
       />
     );
     expect(screen.getByRole("button", { name: /delete task 1/i })).toBeInTheDocument();
