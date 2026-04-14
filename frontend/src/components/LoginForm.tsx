@@ -13,18 +13,23 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const response = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await response.json();
-    if (data.success) {
-      localStorage.setItem("loggedIn", "true");
-      localStorage.setItem("authToken", data.token);
-      onLogin();
-    } else {
-      setError("Invalid credentials");
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        localStorage.setItem("loggedIn", "true");
+        localStorage.setItem("authToken", data.token);
+        localStorage.setItem("userId", String(data.user_id));
+        onLogin();
+      } else {
+        setError("Invalid credentials");
+      }
+    } catch {
+      setError("Cannot reach server");
     }
   };
 

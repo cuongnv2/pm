@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getToken, getUserId } from "@/lib/auth";
 
 interface Message {
   id: string;
@@ -8,15 +9,7 @@ interface Message {
   isUser: boolean;
 }
 
-const getToken = () => {
-  try {
-    return localStorage.getItem("authToken") || "";
-  } catch {
-    return "";
-  }
-};
-
-export const ChatSidebar = ({ onRefresh }: { onRefresh: () => void }) => {
+export const ChatSidebar = ({ onRefresh, onAuthError = () => {} }: { onRefresh: () => void; onAuthError?: () => void }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,7 +27,7 @@ export const ChatSidebar = ({ onRefresh }: { onRefresh: () => void }) => {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/ai/chat/1", {
+      const response = await fetch(`/api/ai/chat/${getUserId()}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -53,6 +46,8 @@ export const ChatSidebar = ({ onRefresh }: { onRefresh: () => void }) => {
         if (data.updated) {
           onRefresh();
         }
+      } else if (response.status === 401 || response.status === 403) {
+        onAuthError();
       } else {
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),

@@ -4,14 +4,7 @@ import { useState, useEffect } from "react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { LoginForm } from "@/components/LoginForm";
 import { BoardData } from "@/lib/kanban";
-
-const getToken = () => {
-  try {
-    return localStorage.getItem("authToken") || "";
-  } catch {
-    return "";
-  }
-};
+import { getToken, getUserId } from "@/lib/auth";
 
 export default function Home() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -41,7 +34,7 @@ export default function Home() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/board/1", {
+      const response = await fetch(`/api/board/${getUserId()}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (response.ok) {
@@ -51,6 +44,7 @@ export default function Home() {
       } else if (response.status === 401 || response.status === 403) {
         localStorage.removeItem("loggedIn");
         localStorage.removeItem("authToken");
+        localStorage.removeItem("userId");
         setLoggedIn(false);
       } else {
         setError("Failed to load board");
@@ -69,6 +63,7 @@ export default function Home() {
   const handleLogout = () => {
     localStorage.removeItem("loggedIn");
     localStorage.removeItem("authToken");
+    localStorage.removeItem("userId");
     setLoggedIn(false);
     setBoardData(null);
     setError("");
@@ -76,12 +71,18 @@ export default function Home() {
 
   const refreshBoard = async () => {
     try {
-      const response = await fetch("/api/board/1", {
+      const response = await fetch(`/api/board/${getUserId()}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (response.ok) {
         const data = await response.json();
         setBoardData(data);
+      } else if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("userId");
+        setLoggedIn(false);
+      } else {
+        setError("Failed to refresh board");
       }
     } catch {
       setError("Failed to refresh board");
@@ -90,7 +91,7 @@ export default function Home() {
 
   const handleUpdateBoard = async (newData: BoardData) => {
     try {
-      const response = await fetch("/api/board/1", {
+      const response = await fetch(`/api/board/${getUserId()}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -100,8 +101,13 @@ export default function Home() {
       });
       if (response.ok) {
         setBoardData(newData);
+      } else if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("userId");
+        setLoggedIn(false);
       } else {
         setError("Failed to update board");
+        await refreshBoard();
       }
     } catch {
       setError("Network error");

@@ -3,6 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { ChatSidebar } from "@/components/ChatSidebar";
 
+vi.mock("@/lib/auth", () => ({
+  getToken: () => "test-token",
+  getUserId: () => "1",
+}));
+
 global.fetch = vi.fn();
 
 describe("ChatSidebar", () => {

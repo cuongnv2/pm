@@ -15,15 +15,22 @@ from passlib.context import CryptContext
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 import jwt
+import logging
 import os
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
 # Auth
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
+JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
 security = HTTPBearer()
 
@@ -43,7 +50,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
 
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///kanban.db")
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL)
 
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_conn, connection_record):
@@ -194,7 +201,7 @@ async def login(request: LoginRequest):
     try:
         user = db.query(User).filter(User.username == request.username).first()
         if user and pwd_context.verify(request.password, user.password_hash):
-            return JSONResponse(content={"success": True, "token": create_token(user.id)})
+            return JSONResponse(content={"success": True, "token": create_token(user.id), "user_id": user.id})
         return JSONResponse(content={"success": False}, status_code=401)
     finally:
         db.close()
@@ -249,7 +256,8 @@ async def ai_chat(user_id: int, request: ChatRequest, current_user_id: int = Dep
             try:
                 board_update = BoardUpdate.model_validate(updates)
                 _replace_board(db, board, board_update)
-            except Exception:
+            except Exception as exc:
+                logger.warning("AI board update validation failed: %s", exc)
                 updates = None
         return JSONResponse(content={"response": response_text, "updated": updates is not None})
     except HTTPException:
