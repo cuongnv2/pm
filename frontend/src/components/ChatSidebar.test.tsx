@@ -11,6 +11,7 @@ describe("ChatSidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (global.fetch as any).mockClear();
+    try { localStorage.clear(); } catch { /* jsdom may not expose localStorage */ }
   });
 
   it("renders chat sidebar with title and input", () => {
@@ -44,11 +45,14 @@ describe("ChatSidebar", () => {
     await user.click(sendButton);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/ai/chat/1", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "Hello AI" }),
-      });
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/ai/chat/1",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ message: "Hello AI" }),
+        })
+      );
     });
   });
 

@@ -5,6 +5,14 @@ import { KanbanBoard } from "@/components/KanbanBoard";
 import { LoginForm } from "@/components/LoginForm";
 import { BoardData } from "@/lib/kanban";
 
+const getToken = () => {
+  try {
+    return localStorage.getItem("authToken") || "";
+  } catch {
+    return "";
+  }
+};
+
 export default function Home() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [boardData, setBoardData] = useState<BoardData | null>(null);
@@ -13,8 +21,8 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem("loggedIn") === "true";
-    if (isLoggedIn) {
+    const savedToken = getToken();
+    if (savedToken) {
       fetchBoard();
     }
     const isDark = localStorage.getItem("darkMode") === "true";
@@ -31,16 +39,23 @@ export default function Home() {
 
   const fetchBoard = async () => {
     setLoading(true);
+    setError("");
     try {
-      const response = await fetch("/api/board/1");
+      const response = await fetch("/api/board/1", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setBoardData(data);
         setLoggedIn(true);
+      } else if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem("loggedIn");
+        localStorage.removeItem("authToken");
+        setLoggedIn(false);
       } else {
         setError("Failed to load board");
       }
-    } catch (err) {
+    } catch {
       setError("Network error");
     } finally {
       setLoading(false);
@@ -53,18 +68,22 @@ export default function Home() {
 
   const handleLogout = () => {
     localStorage.removeItem("loggedIn");
+    localStorage.removeItem("authToken");
     setLoggedIn(false);
     setBoardData(null);
+    setError("");
   };
 
   const refreshBoard = async () => {
     try {
-      const response = await fetch("/api/board/1");
+      const response = await fetch("/api/board/1", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setBoardData(data);
       }
-    } catch (err) {
+    } catch {
       setError("Failed to refresh board");
     }
   };
@@ -73,7 +92,10 @@ export default function Home() {
     try {
       const response = await fetch("/api/board/1", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
         body: JSON.stringify(newData),
       });
       if (response.ok) {
@@ -81,7 +103,7 @@ export default function Home() {
       } else {
         setError("Failed to update board");
       }
-    } catch (err) {
+    } catch {
       setError("Network error");
     }
   };
@@ -94,9 +116,28 @@ export default function Home() {
     return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
   }
 
-  if (error) {
-    return <div className="flex min-h-screen items-center justify-center text-red-500">{error}</div>;
+  if (error || !boardData) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <p className="text-red-500">{error || "Board not found"}</p>
+        <button
+          onClick={handleLogout}
+          className="rounded-lg bg-blue-500 px-4 py-2 font-semibold text-white transition hover:bg-blue-700"
+        >
+          Back to Login
+        </button>
+      </div>
+    );
   }
 
-  return <KanbanBoard initialData={boardData} onUpdate={handleUpdateBoard} onLogout={handleLogout} onRefresh={refreshBoard} onToggleDark={toggleDarkMode} darkMode={darkMode} />;
+  return (
+    <KanbanBoard
+      initialData={boardData}
+      onUpdate={handleUpdateBoard}
+      onLogout={handleLogout}
+      onRefresh={refreshBoard}
+      onToggleDark={toggleDarkMode}
+      darkMode={darkMode}
+    />
+  );
 }

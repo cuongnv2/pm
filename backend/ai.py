@@ -13,20 +13,23 @@ def call_ai(prompt: str) -> str:
         "Content-Type": "application/json"
     }
     data = {
-        "model": "nvidia/nemotron-3-super-120b-a12b:free",  # Free chat model
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
         "messages": [{"role": "user", "content": prompt}]
     }
-    response = requests.post(url, headers=headers, json=data)
+    response = requests.post(url, headers=headers, json=data, timeout=30)
     if response.status_code == 200:
         result = response.json()
         return result["choices"][0]["message"]["content"]
     else:
         raise Exception(f"AI call failed: {response.status_code} {response.text}")
 
-def call_ai_with_board(board_json: dict, user_input: str, history: list = []) -> dict:
+def call_ai_with_board(board_json: dict, user_input: str, history: list | None = None) -> dict:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise Exception("OPENROUTER_API_KEY not set")
+
+    if history is None:
+        history = []
 
     board_str = json.dumps(board_json)
     history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history])
@@ -52,14 +55,13 @@ Only output valid JSON."""
         "model": "nvidia/nemotron-3-super-120b-a12b:free",
         "messages": [{"role": "user", "content": prompt}]
     }
-    response = requests.post(url, headers=headers, json=data)
+    response = requests.post(url, headers=headers, json=data, timeout=30)
     if response.status_code == 200:
         result = response.json()
         content = result["choices"][0]["message"]["content"]
         try:
             return json.loads(content)
         except json.JSONDecodeError:
-            # If not JSON, wrap in response
             return {"response": content, "updates": None}
     else:
         raise Exception(f"AI call failed: {response.status_code} {response.text}")

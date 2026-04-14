@@ -21,6 +21,7 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
     const data = await response.json();
     if (data.success) {
       localStorage.setItem("loggedIn", "true");
+      localStorage.setItem("authToken", data.token);
       onLogin();
     } else {
       setError("Invalid credentials");
@@ -63,11 +64,12 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
             required
           />
         </div>
-        <input
+        <button
           type="submit"
-          value="Sign In"
           className="w-full rounded-lg bg-blue-500 px-4 py-2 font-semibold text-white transition hover:bg-blue-700"
-        />
+        >
+          Sign In
+        </button>
       </form>
     </div>
   );

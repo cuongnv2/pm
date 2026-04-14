@@ -8,6 +8,14 @@ interface Message {
   isUser: boolean;
 }
 
+const getToken = () => {
+  try {
+    return localStorage.getItem("authToken") || "";
+  } catch {
+    return "";
+  }
+};
+
 export const ChatSidebar = ({ onRefresh }: { onRefresh: () => void }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -28,7 +36,10 @@ export const ChatSidebar = ({ onRefresh }: { onRefresh: () => void }) => {
     try {
       const response = await fetch("/api/ai/chat/1", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
         body: JSON.stringify({ message: userMessage.text }),
       });
       const data = await response.json();
@@ -50,7 +61,7 @@ export const ChatSidebar = ({ onRefresh }: { onRefresh: () => void }) => {
         };
         setMessages((prev) => [...prev, errorMessage]);
       }
-    } catch (err) {
+    } catch {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: "Network error",
@@ -90,7 +101,7 @@ export const ChatSidebar = ({ onRefresh }: { onRefresh: () => void }) => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
             placeholder="Ask the AI..."
             className="flex-1 px-3 py-2 border border-[var(--stroke)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
             disabled={loading}

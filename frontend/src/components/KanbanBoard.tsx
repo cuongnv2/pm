@@ -7,18 +7,37 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
+  pointerWithin,
+  closestCenter,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { useCallback } from "react";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { ChatSidebar } from "@/components/ChatSidebar";
-import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
+import { createId, moveCard, type BoardData } from "@/lib/kanban";
 
-export const KanbanBoard = ({ initialData, onUpdate, onLogout, onRefresh, onToggleDark, darkMode }: { initialData: any, onUpdate: (data: any) => void, onLogout: () => void, onRefresh: () => void, onToggleDark: () => void, darkMode: boolean }) => {
+interface KanbanBoardProps {
+  initialData: BoardData | null;
+  onUpdate: (data: BoardData) => void;
+  onLogout: () => void;
+  onRefresh: () => void;
+  onToggleDark: () => void;
+  darkMode: boolean;
+}
+
+export const KanbanBoard = ({ initialData, onUpdate, onLogout, onRefresh, onToggleDark, darkMode }: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData>(() => initialData || { columns: [], cards: {} });
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+
+  // Use pointer position for collision detection so the drag overlay's
+  // width doesn't bleed into adjacent columns.
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const pointerCollisions = pointerWithin(args);
+    return pointerCollisions.length > 0 ? pointerCollisions : closestCenter(args);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -162,7 +181,7 @@ export const KanbanBoard = ({ initialData, onUpdate, onLogout, onRefresh, onTogg
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={collisionDetection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >

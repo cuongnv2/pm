@@ -1,58 +1,87 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
-from .models import Base, User, Board, ColumnModel, Card
-from .ai import call_ai, call_ai_with_board
+try:
+    from .models import Base, User, Board, ColumnModel, Card
+    from .ai import call_ai, call_ai_with_board
+except ImportError:
+    from models import Base, User, Board, ColumnModel, Card
+    from ai import call_ai, call_ai_with_board
+from passlib.context import CryptContext
 from dotenv import load_dotenv
-import json
+from datetime import datetime, timedelta, timezone
+import jwt
+import os
 
 load_dotenv()
 
 app = FastAPI()
 
-# Database setup
-DATABASE_URL = "sqlite:///kanban.db"
+# Auth
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
+JWT_ALGORITHM = "HS256"
+security = HTTPBearer()
+
+def create_token(user_id: int) -> str:
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return int(payload["user_id"])
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+# Database
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///kanban.db")
 engine = create_engine(DATABASE_URL, echo=True)
+
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create tables
 Base.metadata.create_all(bind=engine)
 
-# Initialize default data
 def init_db():
     db: Session = SessionLocal()
     try:
-        # Check if user exists
         user = db.query(User).filter(User.username == "user").first()
         if not user:
-            user = User(username="user", password_hash="password")  # Plain for MVP
+            user = User(username="user", password_hash=pwd_context.hash("password"))
             db.add(user)
             db.commit()
             db.refresh(user)
 
-            # Create board
             board = Board(user_id=user.id, name="My Kanban Board")
             db.add(board)
             db.commit()
             db.refresh(board)
 
-            # Create columns
             columns_data = [
                 ("Backlog", 0),
                 ("Discovery", 1),
                 ("In Progress", 2),
                 ("Review", 3),
-                ("Done", 4)
+                ("Done", 4),
             ]
             for title, pos in columns_data:
                 col = ColumnModel(board_id=board.id, title=title, position=pos)
                 db.add(col)
             db.commit()
 
-            # Create cards
             cards_data = [
                 (0, "Align roadmap themes", "Draft quarterly themes with impact statements and metrics.", 0),
                 (0, "Gather customer signals", "Review support tags, sales notes, and churn feedback.", 1),
@@ -61,7 +90,7 @@ def init_db():
                 (2, "Design card layout", "Add hierarchy and spacing for scanning dense lists.", 1),
                 (3, "QA micro-interactions", "Verify hover, focus, and loading states.", 0),
                 (4, "Ship marketing page", "Final copy approved and asset pack delivered.", 0),
-                (4, "Close onboarding sprint", "Document release notes and share internally.", 1)
+                (4, "Close onboarding sprint", "Document release notes and share internally.", 1),
             ]
             columns = db.query(ColumnModel).filter(ColumnModel.board_id == board.id).all()
             col_dict = {col.position: col.id for col in columns}
@@ -69,101 +98,126 @@ def init_db():
                 card = Card(column_id=col_dict[col_pos], title=title, details=details, position=pos)
                 db.add(card)
             db.commit()
+        elif not user.password_hash.startswith("$2"):
+            # Upgrade legacy plaintext password to bcrypt hash
+            user.password_hash = pwd_context.hash("password")
+            db.commit()
     finally:
         db.close()
 
 init_db()
 
+# Pydantic models
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+class CardData(BaseModel):
+    title: str
+    details: str = ""
+
+class ColumnData(BaseModel):
+    title: str
+    cardIds: list[str]
+
+class BoardUpdate(BaseModel):
+    columns: list[ColumnData]
+    cards: dict[str, CardData]
+
+class ChatRequest(BaseModel):
+    message: str
+
+# Helpers
+def _get_board_or_404(db: Session, user_id: int) -> Board:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    board = db.query(Board).filter(Board.user_id == user_id).first()
+    if not board:
+        raise HTTPException(status_code=404, detail="Board not found")
+    return board
+
+def _serialize_board(db: Session, board: Board) -> dict:
+    columns = db.query(ColumnModel).filter(ColumnModel.board_id == board.id).order_by(ColumnModel.position).all()
+    cards = db.query(Card).filter(Card.column_id.in_([c.id for c in columns])).all()
+    cards_by_col: dict[int, list] = {}
+    for card in cards:
+        cards_by_col.setdefault(card.column_id, []).append(card)
+    return {
+        "columns": [
+            {
+                "id": f"col-{c.id}",
+                "title": c.title,
+                "cardIds": [
+                    f"card-{card.id}"
+                    for card in sorted(cards_by_col.get(c.id, []), key=lambda x: x.position)
+                ],
+            }
+            for c in columns
+        ],
+        "cards": {
+            f"card-{card.id}": {
+                "id": f"card-{card.id}",
+                "title": card.title,
+                "details": card.details or "",
+            }
+            for card in cards
+        },
+    }
+
+def _replace_board(db: Session, board: Board, update: BoardUpdate) -> None:
+    col_ids = [c.id for c in db.query(ColumnModel).filter(ColumnModel.board_id == board.id).all()]
+    if col_ids:
+        db.query(Card).filter(Card.column_id.in_(col_ids)).delete(synchronize_session=False)
+    db.query(ColumnModel).filter(ColumnModel.board_id == board.id).delete(synchronize_session=False)
+    db.commit()
+    for col_pos, col_data in enumerate(update.columns):
+        col = ColumnModel(board_id=board.id, title=col_data.title, position=col_pos)
+        db.add(col)
+        db.flush()
+        for card_pos, card_id in enumerate(col_data.cardIds):
+            card_data = update.cards.get(card_id)
+            if card_data:
+                card = Card(
+                    column_id=col.id,
+                    title=card_data.title,
+                    details=card_data.details,
+                    position=card_pos,
+                )
+                db.add(card)
+    db.commit()
+
+# Endpoints
 @app.post("/api/login")
 async def login(request: LoginRequest):
     db: Session = SessionLocal()
     try:
         user = db.query(User).filter(User.username == request.username).first()
-        if user and user.password_hash == request.password:
-            return JSONResponse(content={"success": True})
+        if user and pwd_context.verify(request.password, user.password_hash):
+            return JSONResponse(content={"success": True, "token": create_token(user.id)})
         return JSONResponse(content={"success": False}, status_code=401)
     finally:
         db.close()
 
 @app.get("/api/board/{user_id}")
-async def get_board(user_id: int):
+async def get_board(user_id: int, current_user_id: int = Depends(verify_token)):
+    if current_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        board = db.query(Board).filter(Board.user_id == user_id).first()
-        if not board:
-            raise HTTPException(status_code=404, detail="Board not found")
-
-        columns = db.query(ColumnModel).filter(ColumnModel.board_id == board.id).order_by(ColumnModel.position).all()
-        cards = db.query(Card).filter(Card.column_id.in_([c.id for c in columns])).all()
-
-        board_data = {
-            "columns": [
-                {
-                    "id": f"col-{c.title.lower().replace(' ', '-')}",
-                    "title": c.title,
-                    "cardIds": [f"card-{card.id}" for card in sorted(cards, key=lambda x: x.position) if card.column_id == c.id]
-                } for c in columns
-            ],
-            "cards": {
-                f"card-{card.id}": {
-                    "id": f"card-{card.id}",
-                    "title": card.title,
-                    "details": card.details or ""
-                } for card in cards
-            }
-        }
-        return JSONResponse(content=board_data)
+        board = _get_board_or_404(db, user_id)
+        return JSONResponse(content=_serialize_board(db, board))
     finally:
         db.close()
 
-class BoardUpdate(BaseModel):
-    columns: list
-    cards: dict
-
 @app.put("/api/board/{user_id}")
-async def update_board(user_id: int, update: BoardUpdate):
+async def update_board(user_id: int, update: BoardUpdate, current_user_id: int = Depends(verify_token)):
+    if current_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        board = db.query(Board).filter(Board.user_id == user_id).first()
-        if not board:
-            raise HTTPException(status_code=404, detail="Board not found")
-
-        # Clear existing data
-        db.query(Card).filter(Card.column_id.in_([c.id for c in db.query(ColumnModel).filter(ColumnModel.board_id == board.id).all()])).delete()
-        db.query(ColumnModel).filter(ColumnModel.board_id == board.id).delete()
-        db.commit()
-
-        # Insert new data
-        for col_data in update.columns:
-            col = ColumnModel(
-                board_id=board.id,
-                title=col_data["title"],
-                position=update.columns.index(col_data)
-            )
-            db.add(col)
-            db.flush()  # To get id
-            for card_id in col_data["cardIds"]:
-                card_data = update.cards[card_id]
-                card = Card(
-                    column_id=col.id,
-                    title=card_data["title"],
-                    details=card_data["details"],
-                    position=col_data["cardIds"].index(card_id)
-                )
-                db.add(card)
-        db.commit()
+        board = _get_board_or_404(db, user_id)
+        _replace_board(db, board, update)
         return JSONResponse(content={"success": True})
     finally:
         db.close()
@@ -180,83 +234,31 @@ async def test_ai():
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
-class ChatRequest(BaseModel):
-    message: str
-
 @app.post("/api/ai/chat/{user_id}")
-async def ai_chat(user_id: int, request: ChatRequest):
+async def ai_chat(user_id: int, request: ChatRequest, current_user_id: int = Depends(verify_token)):
+    if current_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        board = db.query(Board).filter(Board.user_id == user_id).first()
-        if not board:
-            raise HTTPException(status_code=404, detail="Board not found")
-
-        columns = db.query(ColumnModel).filter(ColumnModel.board_id == board.id).order_by(ColumnModel.position).all()
-        cards = db.query(Card).filter(Card.column_id.in_([c.id for c in columns])).all()
-
-        board_data = {
-            "columns": [
-                {
-                    "id": f"col-{c.title.lower().replace(' ', '-')}",
-                    "title": c.title,
-                    "cardIds": [f"card-{card.id}" for card in sorted(cards, key=lambda x: x.position) if card.column_id == c.id]
-                } for c in columns
-            ],
-            "cards": {
-                f"card-{card.id}": {
-                    "id": f"card-{card.id}",
-                    "title": card.title,
-                    "details": card.details or ""
-                } for card in cards
-            }
-        }
-
-        # For MVP, no history
-        history = []
-
-        ai_response = call_ai_with_board(board_data, request.message, history)
-
+        board = _get_board_or_404(db, user_id)
+        board_data = _serialize_board(db, board)
+        ai_response = call_ai_with_board(board_data, request.message)
         response_text = ai_response.get("response", "No response")
         updates = ai_response.get("updates")
-
         if updates:
-            # Apply updates
-            # Clear existing
-            db.query(Card).filter(Card.column_id.in_([c.id for c in db.query(ColumnModel).filter(ColumnModel.board_id == board.id).all()])).delete()
-            db.query(ColumnModel).filter(ColumnModel.board_id == board.id).delete()
-            db.commit()
-
-            # Insert new
-            for col_data in updates.get("columns", []):
-                col = ColumnModel(
-                    board_id=board.id,
-                    title=col_data["title"],
-                    position=updates["columns"].index(col_data)
-                )
-                db.add(col)
-                db.flush()
-                for card_id in col_data["cardIds"]:
-                    card_data = updates["cards"][card_id]
-                    card = Card(
-                        column_id=col.id,
-                        title=card_data["title"],
-                        details=card_data["details"],
-                        position=col_data["cardIds"].index(card_id)
-                    )
-                    db.add(card)
-            db.commit()
-
+            try:
+                board_update = BoardUpdate.model_validate(updates)
+                _replace_board(db, board, board_update)
+            except Exception:
+                updates = None
         return JSONResponse(content={"response": response_text, "updated": updates is not None})
+    except HTTPException:
+        raise
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
     finally:
         db.close()
 
 # Mount static files
-import os
 if os.path.exists("frontend/out"):
     app.mount("/", StaticFiles(directory="frontend/out", html=True), name="static")
